@@ -19,10 +19,10 @@ from stats import StatCalculator
 pars = Parameters()
 
 exp_num_ls = ["230424_00", "230427_00", "230504_03", "230504_04", 
-              "230504_05", "230504_06", "230506_00", "230514_00", ]
+              "230504_05", "230504_06", "230506_00", "230514_00", "240802_04"]
 result_columns = [
     "file", "gt", "lgt", "rgt", "cls", 
-    "pd", "lpd", "rpd", "bg", "E", "ECa", "ECb", "ECE", "ECP", "DISP", "SR", "T", 
+    "pd", "lpd", "rpd", "bg", "E", "ECa", "ECb", "ECE", "EC_cat_k", "DISP", "SR", "T", "EC_cat_kd", "EC_cat_ks",
     "noise_mag", "sr_cache", 
 ]
 

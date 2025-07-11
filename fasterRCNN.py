@@ -118,6 +118,14 @@ class FasterRCNNwrap(pl.LightningModule):
         self.learning_rate = learning_rate
         self.num_classes = num_classes
         self.model = FasterRCNN(backbone=ResNet(BasicBlock, [2, 2, 2, 2]), num_classes=num_classes)
+        
+        # # === 1. Freeze ALL layers ===
+        # for param in self.model.parameters():
+        #     param.requires_grad = False
+        
+        # # === 2. Unfreeze ONLY the box_predictor (last layer) ===
+        # for param in self.model.roi_heads.box_predictor.parameters():
+        #     param.requires_grad = True        
 
     def forward(self, x):
         self.model.eval()
@@ -127,6 +135,20 @@ class FasterRCNNwrap(pl.LightningModule):
         images, targets = batch
         loss_dict, _, _ = self.model(images, targets)
         loss = sum(loss for loss in loss_dict.values())
+        
+        if torch.isfinite(loss):
+            # normal path…
+            self.log("train/loss", loss)
+            return {"loss": loss}
+
+        # ——— NaN detected. Try each sample singly ———
+        for i, (img, tgt) in enumerate(zip(images, targets)):
+            ld, _, _ = self.model([img], [tgt])
+            single_loss = sum(ld.values())
+            if not torch.isfinite(single_loss):
+                bad = tgt["filename"]
+                raise RuntimeError(f"Sample index {i} in batch {batch_idx} is bad: {bad}")
+        
         loss_dict.update({"total": loss})
         self.log("train loss", loss_dict)
         return {"loss": loss, "log": loss_dict}
@@ -143,3 +165,9 @@ class FasterRCNNwrap(pl.LightningModule):
 
     def configure_optimizers(self):
         return torch.optim.SGD(self.model.parameters(), lr=self.learning_rate, momentum=0.9, weight_decay=0.005)
+        # return torch.optim.SGD(
+        #     self.model.roi_heads.box_predictor.parameters(),
+        #     lr=self.learning_rate,
+        #     momentum=0.9,
+        #     weight_decay=0.005
+        # )  # Only optimize the box predictor --- last layer freezed

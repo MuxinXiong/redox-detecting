@@ -4,15 +4,31 @@ import numpy as np
 class Parameters():
     def __init__(self):
         # detection data
-        self.det_labels = ['E', 'ECa', 'ECb', 'ECE', 'ECP', 'DISP', 'SR', 'T']
-        self.det_key = {"E": 0, "ECa": 1, "ECb": 2, "ECE": 3, "ECP": 4, "DISP": 5, "SR": 6, "T": 7}
-        self.det_data_dir = "./data"
-        self.num_cls = 8
+        self.det_labels = [
+            'E', 'ECa', 'ECb', 'ECE', 'EC_cat_k',
+            'DISP', 'SR', 'T',
+            'EC_cat_kd',    # ← 9th class
+            'EC_cat_ks'     # ← 10th class
+        ]
+        self.det_key = {
+            "E": 0,
+            "ECa": 1,
+            "ECb": 2,
+            "ECE": 3,
+            "EC_cat_k": 4,
+            "DISP": 5,
+            "SR": 6,
+            "T": 7,
+            "EC_cat_kd": 8,  # ← match labels above
+            "EC_cat_ks": 9   # ← match labels above
+        }
+        self.det_data_dir = "/home/muxin/ML_RCNN/Muxin_DL_Redox_4_20"
+        self.num_cls = 10      # ← was 8
         self.max_nbox = 4
         
         self.rescale = 1000
         self.min_noise_mag = 0
-        self.max_noise_mag = 0.01
+        self.max_noise_mag = 0.2
         
         self.min_sr = 1
         self.max_sr = 6
@@ -45,10 +61,10 @@ class Parameters():
         self.batch_size_val = 64
         self.batch_size_test = 128
         self.lr = 1e-3
-        self.max_epochs = 100
+        self.max_epochs = 1000
         self.loss_names = ["total", "loss_objectness", "loss_rpn_box_reg", "loss_classifier", "loss_box_reg", ]
         
-        self.cache_dir = "cache/det_train"
+        self.cache_dir = "/home/muxin/ML_RCNN/Muxin_DL_Redox_4_20/cache/det_train"
         self.save_label = "240802_04"
         self.save_loc = f"{self.cache_dir}/output{self.save_label}"
     

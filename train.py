@@ -1,22 +1,34 @@
+
 import os
 
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
+torch.autograd.set_detect_anomaly(True)
 from pytorch_lightning.callbacks import ModelCheckpoint, ModelSummary
 from pytorch_lightning.strategies.ddp import DDPStrategy
 
 from data import DetectionDataModule
 from fasterRCNN import FasterRCNNwrap
 from parameters import Parameters
+
+
+
 pars = Parameters()
 
 class_dict_9 = {
-    'CE' : 0, 'EC' : 1, 'E' : 2, 
-    'ECE' : 3, 'DISP' : 4, 'DL' : 5, 
-    'ECP' : 6, 'SR' : 7, 'T' : 8
-}
-key_list_8 = ["T", "EC", "CE", "ECE", "ECP", "DISP", "SR", "E"]
+     'ECb' : 0, 'ECa' : 1, 'E' : 2, 
+     'ECE' : 3, 'DISP' : 4, 'DL' : 5, 
+     'EC_cat_k' : 6, 'SR' : 7, 'T' : 8, 'EC_cat_kd' : 9, 'EC_cat_ks' : 10
+ }
+key_list_8 = ["T", "ECb", "ECa", "ECE", "EC_cat_k", "DISP", "SR", "E", "EC_cat_kd", "EC_cat_ks"]
+
+# all_labels = pars.det_labels + ['DL']
+
+# class_dict_9 = { lab: idx for idx, lab in enumerate(all_labels) }
+
+# key_list_8 = all_labels.copy()
+
 if not os.path.exists(pars.save_loc):
     os.mkdir(pars.save_loc)
 
@@ -40,15 +52,21 @@ trainer = pl.Trainer(
     max_epochs=pars.max_epochs,
     logger=pl.loggers.TensorBoardLogger(pars.save_loc),
     accelerator="gpu",
-    devices=1,
+    devices=2,
     default_root_dir="output",
     callbacks=[checkpoint_callback],
     strategy=DDPStrategy(find_unused_parameters=False),
-    log_every_n_steps=5
+    log_every_n_steps=50,
+    detect_anomaly=True
     #profiler="pytorch", 
 )
 
 model_rcnn = FasterRCNNwrap(learning_rate=pars.lr, num_classes=pars.num_cls + 1)
+# #print(model_rcnn.model.roi_heads.box_predictor)
+
+# checkpoint = torch.load(r'/home/muxin/output250704_01/ckpts/epoch=289-step=154570.ckpt', map_location='cpu')
+# model_rcnn.load_state_dict(checkpoint['state_dict'], strict=False)
 
 print("begin training")
 trainer.fit(model_rcnn, datamodule)
+#trainer.fit(model_rcnn, datamodule, ckpt_path=r'/home/muxin/ML_RCNN/Muxin_DL_Redox_4_20_R/cache/det_train/output240802_04/ckpts/epoch=289-step=154570.ckpt')

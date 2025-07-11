@@ -89,7 +89,6 @@ def _batched_nms_coordinate_trick(boxes, scores, idxs, iou_threshold):
     keep = nms1d(boxes, scores, iou_threshold)
     return keep
 
-
 def fastrcnn_loss(class_logits, box_regression, labels, regression_targets):
     labels = torch.cat(labels, dim=0)
     regression_targets = torch.cat(regression_targets, dim=0)
@@ -108,6 +107,34 @@ def fastrcnn_loss(class_logits, box_regression, labels, regression_targets):
     )
     box_loss = box_loss / labels.numel()
     return classification_loss, box_loss
+
+# def fastrcnn_loss(class_logits, box_regression, labels, regression_targets):
+#     # flatten everything
+#     labels_all = torch.cat(labels, dim=0).to(torch.int64)
+#     regression_targets_all = torch.cat(regression_targets, dim=0)
+
+#     # classification loss (always safe)
+#     cls_loss = F.cross_entropy(class_logits, labels_all)
+
+#     # reshape regression: [N, C*2] -> [N, C, 2]
+#     N = class_logits.size(0)
+#     box_regression = box_regression.view(N, -1, 2)
+
+#     # find positives
+#     pos_inds = torch.where(labels_all > 0)[0]
+#     if pos_inds.numel() > 0:
+#         labels_pos = labels_all[pos_inds]
+#         preds = box_regression[pos_inds, labels_pos]
+#         targs = regression_targets_all[pos_inds]
+
+#         reg_loss = F.smooth_l1_loss(preds, targs, beta=1/9, reduction="sum")
+#         # normalize by total number of proposals, not just positives
+#         reg_loss = reg_loss / labels_all.numel()
+#     else:
+#         # no positives → zero regression loss
+#         reg_loss = torch.tensor(0.0, device=class_logits.device)
+
+#     return cls_loss, reg_loss
 
 
 class RPNHead(nn.Module):
@@ -415,7 +442,7 @@ class RoIHeads1d(RoIHeads):
         regression_targets = self.box_coder.encode(matched_gt_boxes, proposals)
         return proposals, matched_idxs, labels, regression_targets
 
-    def postprocess_detections(self, class_logits, box_regression, proposals, image_shapes):
+    def postprocess_detections(self, class_logits, box_regression, proposals, image_shapes): #Copied from the previous changed version to solve the GPU/CPU device issues---not really sure
         device = class_logits.device
         num_classes = class_logits.shape[-1]
 
@@ -425,41 +452,34 @@ class RoIHeads1d(RoIHeads):
 
         pred_boxes_list = pred_boxes.split(boxes_per_image, 0)
         pred_scores_list = pred_scores.split(boxes_per_image, 0)
-        all_boxes = []
-        all_scores = []
-        all_labels = []
-        all_full_scores = []
+
+        all_boxes, all_scores, all_labels, all_full_scores = [], [], [], []
+
         for boxes, scores, image_shape in zip(pred_boxes_list, pred_scores_list, image_shapes):
-            boxes = boxes.clamp(min=0, max=image_shape)
+            boxes = boxes.clamp(min=0, max=image_shape).to(device)
 
-            # create labels for each prediction
-            labels = torch.arange(num_classes, device=device)
-            labels = labels.view(1, -1).expand_as(scores)
-
-            # remove predictions with the background label
+            labels = torch.arange(num_classes, device=device).view(1, -1).expand_as(scores)
             full_scores = scores
-            boxes = boxes[:, 1:]
-            scores = scores[:, 1:]
-            labels = labels[:, 1:]
-            indices = torch.arange(scores.shape[0])[:, None].expand(scores.shape)
 
-            # batch everything, by making every class prediction be a separate instance
+            # Slice out predictions without background
+            boxes, scores, labels = boxes[:, 1:], scores[:, 1:], labels[:, 1:]
+            indices = torch.arange(scores.shape[0], device=device)[:, None].expand(scores.shape)
+
+            # Flatten everything
             boxes = boxes.reshape(-1, 2)
             scores = scores.reshape(-1)
             labels = labels.reshape(-1)
             indices = indices.reshape(-1)
 
-            # remove low scoring boxes
-            inds = torch.where(scores > self.score_thresh)[0]
+            # Filter out low scores and empty boxes
+            inds = torch.where(scores > self.score_thresh)[0].to(device)
             boxes, scores, labels, indices = boxes[inds], scores[inds], labels[inds], indices[inds]
 
-            # remove empty boxes
-            keep = torch.where((boxes[:, 1] - boxes[:, 0]) >= 1e-2)[0]  # change how area is calculated
+            keep = torch.where((boxes[:, 1] - boxes[:, 0]) >= 1e-2)[0].to(device)
             boxes, scores, labels, indices = boxes[keep], scores[keep], labels[keep], indices[keep]
 
-            # non-maximum suppression, independently done per class
-            keep = _batched_nms_coordinate_trick(boxes, scores, labels, self.nms_thresh)
-            # keep only topk scoring predictions
+            # Apply NMS
+            keep = _batched_nms_coordinate_trick(boxes, scores, labels, self.nms_thresh).to(device)
             keep = keep[: self.detections_per_img]
             boxes, scores, labels, indices = boxes[keep], scores[keep], labels[keep], indices[keep]
 
