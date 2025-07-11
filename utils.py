@@ -89,6 +89,7 @@ def _batched_nms_coordinate_trick(boxes, scores, idxs, iou_threshold):
     keep = nms1d(boxes, scores, iou_threshold)
     return keep
 
+
 def fastrcnn_loss(class_logits, box_regression, labels, regression_targets):
     labels = torch.cat(labels, dim=0)
     regression_targets = torch.cat(regression_targets, dim=0)
@@ -107,34 +108,6 @@ def fastrcnn_loss(class_logits, box_regression, labels, regression_targets):
     )
     box_loss = box_loss / labels.numel()
     return classification_loss, box_loss
-
-# def fastrcnn_loss(class_logits, box_regression, labels, regression_targets):
-#     # flatten everything
-#     labels_all = torch.cat(labels, dim=0).to(torch.int64)
-#     regression_targets_all = torch.cat(regression_targets, dim=0)
-
-#     # classification loss (always safe)
-#     cls_loss = F.cross_entropy(class_logits, labels_all)
-
-#     # reshape regression: [N, C*2] -> [N, C, 2]
-#     N = class_logits.size(0)
-#     box_regression = box_regression.view(N, -1, 2)
-
-#     # find positives
-#     pos_inds = torch.where(labels_all > 0)[0]
-#     if pos_inds.numel() > 0:
-#         labels_pos = labels_all[pos_inds]
-#         preds = box_regression[pos_inds, labels_pos]
-#         targs = regression_targets_all[pos_inds]
-
-#         reg_loss = F.smooth_l1_loss(preds, targs, beta=1/9, reduction="sum")
-#         # normalize by total number of proposals, not just positives
-#         reg_loss = reg_loss / labels_all.numel()
-#     else:
-#         # no positives → zero regression loss
-#         reg_loss = torch.tensor(0.0, device=class_logits.device)
-
-#     return cls_loss, reg_loss
 
 
 class RPNHead(nn.Module):
@@ -442,7 +415,7 @@ class RoIHeads1d(RoIHeads):
         regression_targets = self.box_coder.encode(matched_gt_boxes, proposals)
         return proposals, matched_idxs, labels, regression_targets
 
-    def postprocess_detections(self, class_logits, box_regression, proposals, image_shapes): #Copied from the previous changed version to solve the GPU/CPU device issues---not really sure
+    def postprocess_detections(self, class_logits, box_regression, proposals, image_shapes):
         device = class_logits.device
         num_classes = class_logits.shape[-1]
 

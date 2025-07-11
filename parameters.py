@@ -28,7 +28,7 @@ class Parameters():
         
         self.rescale = 1000
         self.min_noise_mag = 0
-        self.max_noise_mag = 0.2
+        self.max_noise_mag = 0.01
         
         self.min_sr = 1
         self.max_sr = 6

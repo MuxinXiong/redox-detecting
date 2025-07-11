@@ -92,7 +92,6 @@ class DetectionDataset(Dataset):
         noise_mag = np.random.uniform(low=self.min_noise_mag, high=self.max_noise_mag)
         # noise_mag = np.random.uniform(high=self.max_noise_mag)
         noise[(0, 1), :, :] = torch.normal(noise[(0, 1), :, :], std=noise_mag)
-        
         data = data + noise
         
         sr_trim = np.random.randint(low=self.min_sr, high=self.max_sr + 1)
@@ -108,17 +107,8 @@ class DetectionDataset(Dataset):
                 "sr_cache": sr_cache, 
             }, 
         }
-        
-        if target_ret["boxes"].numel() == 0 or target_ret["labels"].numel() == 0:
-            #self.file_list[index] is [subdir, filename]
-            bad = self.file_list[index]
-            raise ValueError(f"[DATA] Empty target for file: {bad[0]}/{bad[1]}")
-        if not torch.isfinite(target_ret["boxes"]).all() or not torch.isfinite(target_ret["labels"]).all():
-            bad = self.file_list[index]
-            raise ValueError(f"[DATA] Non‑finite target for file: {bad[0]}/{bad[1]}")
         # for idx in range(target_ret["labels"].shape[0]):
         #     target_ret["labels"][idx] = int(target_ret["labels"][idx].item()) + 1
-        target_ret["filename"] = os.path.join(self.file_list[index][0], self.file_list[index][1])
         return data, target_ret
     
     def log(self, filename):
